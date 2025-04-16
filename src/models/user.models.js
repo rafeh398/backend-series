@@ -50,7 +50,7 @@ const userSchema = new Schema({
 userSchema.pre("save", async function(next){  //(method,function)
     if (!this.isModified("password")) return next();  //ager filed modify ni hua to nikal jao aghy idr method mein na ayu
 
-    this.password=bcrypt.hash(this.password,10) //(data,rounds)
+    this.password= await bcrypt.hash(this.password,10) //(data,rounds)
     next()   
 } )
 //khud se method bnaya
