@@ -56,14 +56,14 @@ userSchema.pre("save", async function(next){  //(method,function)
 //khud se method bnaya
 
 userSchema.methods.isPasswordCorrect=async function (password) {
- return   await bcrypt.compare(password,this.password)
+ return   await bcrypt.compare(password,this.password) //this.password is hashed in DB
     
 }
 //JWT is like key
 //jiske ps ha hm dege usko data
 
 userSchema.methods.generateAccessToken=function () {
-    jwt.sign({
+   return jwt.sign({
       _id:this._id, //ye hmy mongoDb se mil jayegi
         email:this.email,
         username:this.username,
@@ -77,7 +77,7 @@ userSchema.methods.generateAccessToken=function () {
 }
 
 userSchema.methods.generateRefreshToken=function () {
-    jwt.sign({
+   return jwt.sign({
         _id:this._id, //ye hmy mongoDb se mil jayegi
          
       },
