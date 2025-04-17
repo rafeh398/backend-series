@@ -22,4 +22,18 @@ app.use(express.static("public"))  //public asseets like pdfs and imgs
 
 app.use(cookieParser())
  
+//Routes
+import userRouter from "./routes/user.routes.js"
+
+
+
+//routes declaration
+
+app.use("/api/v1/users",userRouter)  ///user tak jo ata mein handle ni krta mein userRouter ko pass krta hu
+
+//http:localhost:8000/api/v1/user/register
+
+
+
 export {app}
+
