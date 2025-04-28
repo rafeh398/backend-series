@@ -3,12 +3,13 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { log } from "console";
+import jwt from "jsonwebtoken"
+
 
 const generateAccessAndRefreshTokens = async (userId) => {  //yha just generate hue hain particular userid k tokens
     try {
         const user = await User.findById(userId)
-        const accessToken = user.generateAccessToken()
+        const accessToken = user.generateAccessToken()  //yha br br jwt.sign krne ki zrorat nai
         const refreshToken = user.generateRefreshToken()
 
         //save in DB
@@ -118,10 +119,11 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
 
     const { email, username, password } = req.body
+    console.log(email);
 
-    if (!username || !password) {  //ager dono ni
-        throw new ApiError(400, "username or password is required")
 
+    if (!username && !email) {
+        throw new ApiError(400, "username or email is required")
     }
     //ager dono mein se ik ha to user find kro
 
@@ -165,7 +167,8 @@ const loginUser = asyncHandler(async (req, res) => {
 
 
 })
-
+//logout k liye user kaha se le ..login k liye to form dete hain hm
+//design kro apna middle ware
 const logoutUser = asyncHandler(async (req, res) => {
  await   User.findByIdAndUpdate(req.user._id,
         {
@@ -190,4 +193,63 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser, loginUser, logoutUser }
+const refreshAccessToken=asyncHandler(async(req,res)=>{
+//     Checks for a refresh token in cookies or the request body.
+
+// Verifies the refresh token using jwt.verify() to ensure it's valid and not expired.
+
+// Fetches the user from the database using the decoded token's user ID.
+
+// Compares the refresh token sent by the client with the one stored in the database.
+
+// Generates new access and refresh tokens if everything is valid.
+
+// Sends the new tokens back to the client as HTTP-only cookies to keep the session secure.
+
+// Responds with a success message indicating the access token was refreshed.
+    const incomingRefreshToken=req.cookies.refreshToken || req.body.refreshToken
+
+    if (!incomingRefreshToken){
+        throw new ApiError(401,"Unauthorized request")
+    }
+    //ager token ha to verify kr lo
+
+ try {
+      const decodedToken= jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET)
+   
+      const user=await User.findById(decodedToken?._id)
+   
+      if(!user){
+       throw new ApiError(401,"Invalid Refresh Token")
+      }
+      //incoming jo user bej rha or decoded match krta jo db mein ha
+   
+      if(incomingRefreshToken !== user?.refreshToken){
+    throw new ApiError(401,"Refresh token is expired")
+      }
+      //cookies mein rkhna ha or new generate kr do token
+   
+      const options={
+       httpOnly:true,
+       secure:true,
+      }
+      const {accessToken,newRefreshToken}=await generateAccessAndRefreshTokens(user._id)
+   
+      return res
+      .status(200)
+      .cookie("accessToken",accessToken,options)
+      .cookie("refreshToken",newRefreshToken,options)
+      .json(
+       new ApiResponse(
+           200,
+           {accessToken,refreshAccessToken},
+           "access token refreshed "
+       )
+      )
+ } catch (error) {
+    throw new ApiError(401,error?.message || "invalid refresh token")
+ }
+
+})
+
+export { registerUser, loginUser, logoutUser,refreshAccessToken }
