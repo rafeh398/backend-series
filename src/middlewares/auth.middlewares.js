@@ -34,7 +34,7 @@ export const verifyJWT = asyncHandler(async (req, res, next) => {
     }
 
     // Attach user to request object for downstream use
-    req.user = user;
+    req.user = user;  //req.user is current user if user is logged in
     next();
   } catch (error) {
     throw new ApiError(401, error?.message || "Invalid access token");
