@@ -4,6 +4,7 @@ import { User } from "../models/user.models.js"
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 
 
 const generateAccessAndRefreshTokens = async (userId) => {  //yha just generate hue hain particular userid k tokens
@@ -406,49 +407,113 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
         },
         {
             $addFields: {
-                subscriberscount:{
-                    $size:"$subscribers"    //from as
+                subscriberscount: {
+                    $size: "$subscribers"    //from as
                 },
-                channelSubscribedTo:{
-                    $size:"$subscribedTo"
+                channelSubscribedTo: {
+                    $size: "$subscribedTo"
                 },
-                isSubscribed:{
-                    $cond:{
+                isSubscribed: {
+                    $cond: {
                         //dekh lo k ager apke ps jo subscribers wala document(array) ha us mein 
                         // Main mjood hu to ok wrna btn follow wala show kro
-                        if:{ $in: [req.user?._id,"$subscribers.subscriber"]  } , //field k andr ja k subscriber dekho na k owner
-                        then:true,
-                        else:false,
+                        if: { $in: [req.user?._id, "$subscribers.subscriber"] }, //field k andr ja k subscriber dekho na k owner
+                        then: true,
+                        else: false,
                     }
                 }
             }
         },
         {
             //project laga k selected cheeze do
-            $project:{
-                fullName:1,
-                username:1,
-                subscriberscount:1,
-                channelSubscribedTo:1,
-                avatar:1,
-                coverImage:1,
-                email:1,
+            $project: {
+                fullName: 1,
+                username: 1,
+                subscriberscount: 1,
+                channelSubscribedTo: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1,
             }
         }
 
     ])
-    if(!channel?.length){
-        throw new ApiError(404,"channel does not exist")
+    if (!channel?.length) {
+        throw new ApiError(404, "channel does not exist")
     }
-return res
-.status(200)
-.json(
-    new ApiResponse(200, channel[0],"user channel is fetched successfully" )
-)
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, channel[0], "user channel is fetched successfully")
+        )
+})
+
+const getWatchHistory = asyncHandler(async(req, res) => {
+    // When a user watches a video, you push the video’s ObjectId into the watchHistory array.
+    // watchHistory is present in the user model as an array of video ObjectIds.
+
+    const user = await User.aggregate([
+        {
+            // Match the user by their ObjectId to get the correct user
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id) // current user
+            }
+        },
+        {
+            // Lookup the 'videos' collection to populate video details based on the watchHistory array
+            $lookup: {
+                from: "videos",  // Look for the 'videos' collection
+                localField: "watchHistory",  // Field in the User model that stores video IDs
+                foreignField: "_id",  // Match the video IDs in 'watchHistory' to the '_id' field in the 'videos' collection
+                as: "watchHistory",  // This will hold the video details in an array
+                pipeline: [
+                    {
+                        // Lookup to find the owner (uploader) of each video
+                        $lookup: {
+                            from: "users",  // Look for the 'users' collection to get the owner's details
+                            localField: "owner",  // The 'owner' field in the video collection refers to the user who uploaded it
+                            foreignField: "_id",  // Match the 'owner' field to the '_id' field of the 'users' collection
+                            as: "owner",  // This will create an array of owner details
+                            pipeline: [
+                                {
+                                    // Project (select) only the relevant fields from the user (owner)
+                                    $project: {
+                                        fullName: 1,  // Include full name of the user
+                                        username: 1,  // Include username
+                                        avatar: 1  // Include avatar URL
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        // After the nested $lookup, we use $addFields to simplify the owner array
+                        $addFields: {
+                            owner: {
+                                $first: "$owner"  // Extract the first (and only) owner from the array
+                            }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    // Return the user's watch history with the populated video and owner details
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                user[0].watchHistory,  // The populated watch history with video and owner details
+                "Watch history fetched successfully"  // Success message
+            )
+        )
 })
 
 export {
     registerUser, loginUser, logoutUser, refreshAccessToken,
     changeCurrentPassword, getCurrentUser, updateAccountDeatils,
-    updateUserAvatar, updateUserCoverImage, getUserChannelProfile
+    updateUserAvatar, updateUserCoverImage, getUserChannelProfile,
+    getWatchHistory,
 }
